@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'users',
     'orders',
     'products',
+    'payments',
     'drf_spectacular',
     'drf_spectacular_sidecar',
     'django_filters',
