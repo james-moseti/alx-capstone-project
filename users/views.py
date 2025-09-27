@@ -1,6 +1,6 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema, OpenApiResponse
+from drf_spectacular.utils import extend_schema, OpenApiResponse, OpenApiParameter
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -17,16 +17,29 @@ token_generator = PasswordResetTokenGenerator()
 
 # --- Register View ---
 @extend_schema(
-    summary="Register a new user",
-    description="Creates a new user account. No authentication required.",
+    summary="Register a new user account",
+    description=(
+        "Creates a new user account in the system. This endpoint is publicly accessible "
+        "and does not require authentication. Upon successful registration, the user "
+        "will be able to authenticate using their credentials."
+    ),
     request=RegisterSerializer,
     responses={
         201: OpenApiResponse(
             response=RegisterSerializer,
-            description="User created successfully"
+            description="User account created successfully. Returns the user data."
         ),
-        400: OpenApiResponse(description="Validation error"),
-    }
+        400: OpenApiResponse(
+            description=(
+                "Validation error. Common issues include:\n"
+                "- Email already exists\n"
+                "- Username already taken\n"
+                "- Password doesn't meet requirements\n"
+                "- Required fields are missing"
+            )
+        ),
+    },
+    tags=["Authentication"]
 )
 class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
@@ -35,16 +48,74 @@ class RegisterView(generics.CreateAPIView):
 
 # --- Me View (CRUD for current user with soft delete) ---
 @extend_schema(
-    summary="Manage current authenticated user",
+    summary="Retrieve current user profile",
     description=(
-        "Retrieve, update, or deactivate the currently authenticated user. "
-        "DELETE will **soft delete** the user (sets is_active=False) so past orders remain intact."
+        "Returns the profile information of the currently authenticated user. "
+        "Requires a valid JWT token in the Authorization header."
     ),
     responses={
-        200: OpenApiResponse(response=UserSerializer, description="User details"),
-        204: OpenApiResponse(description="User deactivated successfully"),
-        401: OpenApiResponse(description="Unauthorized — invalid or missing JWT token"),
-    }
+        200: OpenApiResponse(
+            response=UserSerializer, 
+            description="Current user profile data"
+        ),
+        401: OpenApiResponse(
+            description="Unauthorized. JWT token is missing, invalid, or expired."
+        ),
+    },
+    tags=["User Management"]
+)
+class MeViewGet(generics.RetrieveAPIView):
+    pass
+
+@extend_schema(
+    summary="Update current user profile",
+    description=(
+        "Updates the profile information of the currently authenticated user. "
+        "Only the fields provided in the request will be updated. "
+        "Requires a valid JWT token in the Authorization header."
+    ),
+    request=UserSerializer,
+    responses={
+        200: OpenApiResponse(
+            response=UserSerializer,
+            description="User profile updated successfully"
+        ),
+        400: OpenApiResponse(
+            description=(
+                "Validation error. Common issues include:\n"
+                "- Email format is invalid\n"
+                "- Email already exists for another user\n"
+                "- Username already taken by another user\n"
+                "- Required fields are invalid"
+            )
+        ),
+        401: OpenApiResponse(
+            description="Unauthorized. JWT token is missing, invalid, or expired."
+        ),
+    },
+    tags=["User Management"]
+)
+class MeViewUpdate(generics.UpdateAPIView):
+    pass
+
+@extend_schema(
+    summary="Deactivate current user account",
+    description=(
+        "Soft deletes the current user account by setting is_active=False. "
+        "This preserves data integrity by maintaining user records for historical data "
+        "(such as past orders) while preventing the user from logging in. "
+        "The account cannot be reactivated through the API. "
+        "Requires a valid JWT token in the Authorization header."
+    ),
+    responses={
+        204: OpenApiResponse(
+            description="User account deactivated successfully. No content returned."
+        ),
+        401: OpenApiResponse(
+            description="Unauthorized. JWT token is missing, invalid, or expired."
+        ),
+    },
+    tags=["User Management"]
 )
 class MeView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = UserSerializer
@@ -65,13 +136,32 @@ class MeView(generics.RetrieveUpdateDestroyAPIView):
 # --- Change Password View ---
 @extend_schema(
     summary="Change password for current user",
-    description="Requires the current password and a new password. JWT authentication required.",
+    description=(
+        "Allows the authenticated user to change their password. "
+        "Requires the current password for verification and a new password. "
+        "The user must be authenticated with a valid JWT token. "
+        "After successful password change, existing JWT tokens remain valid "
+        "until they expire naturally."
+    ),
     request=ChangePasswordSerializer,
     responses={
-        200: OpenApiResponse(description="Password changed successfully"),
-        400: OpenApiResponse(description="Validation error"),
-        401: OpenApiResponse(description="Unauthorized — invalid or missing JWT token"),
-    }
+        200: OpenApiResponse(
+            description="Password changed successfully. Returns success message."
+        ),
+        400: OpenApiResponse(
+            description=(
+                "Validation error. Common issues include:\n"
+                "- Current password is incorrect\n"
+                "- New password doesn't meet security requirements\n"
+                "- New password confirmation doesn't match\n"
+                "- Required fields are missing"
+            )
+        ),
+        401: OpenApiResponse(
+            description="Unauthorized. JWT token is missing, invalid, or expired."
+        ),
+    },
+    tags=["Authentication"]
 )
 class ChangePasswordView(generics.UpdateAPIView):
     serializer_class = ChangePasswordSerializer
@@ -99,16 +189,35 @@ class ChangePasswordView(generics.UpdateAPIView):
 
 # --- Request Reset Link ---
 @extend_schema(
-    summary="Request password reset",
+    summary="Request password reset email",
     description=(
-        "Send a reset link to the provided email. "
-        "The email includes a UID and token for confirming the reset. "
-        "Always returns success to avoid leaking registered emails."
+        "Initiates the password reset process by sending a reset link to the provided email address. "
+        "If the email exists in the system, a password reset email will be sent containing "
+        "a secure link with UID and token parameters. The link expires after a certain period. "
+        "For security reasons, this endpoint always returns a success response regardless "
+        "of whether the email exists in the system (to prevent email enumeration attacks). "
+        "No authentication is required for this endpoint."
     ),
     request=PasswordResetRequestSerializer,
     responses={
-        200: OpenApiResponse(description="Reset link sent (if email exists)."),
-    }
+        200: OpenApiResponse(
+            description=(
+                "Request processed successfully. If the email address is registered, "
+                "a password reset link has been sent. Check your email inbox and spam folder."
+            )
+        ),
+        400: OpenApiResponse(
+            description=(
+                "Validation error. Common issues include:\n"
+                "- Email format is invalid\n"
+                "- Email field is missing or empty"
+            )
+        ),
+        500: OpenApiResponse(
+            description="Server error. Email service may be temporarily unavailable."
+        )
+    },
+    tags=["Authentication"]
 )
 class PasswordResetRequestView(generics.GenericAPIView):
     serializer_class = PasswordResetRequestSerializer
@@ -140,13 +249,51 @@ class PasswordResetRequestView(generics.GenericAPIView):
 
 # --- Confirm Reset ---
 @extend_schema(
-    summary="Confirm password reset",
-    description="Confirm a password reset using UID and token from the reset email, and set a new password.",
+    summary="Confirm password reset with token",
+    description=(
+        "Completes the password reset process using the UID and token received in the reset email. "
+        "This endpoint validates the reset token and sets the new password for the user account. "
+        "The UID and token are typically provided as URL parameters in the reset email link, "
+        "but should be submitted in the request body along with the new password. "
+        "Tokens have a limited lifespan and can only be used once. "
+        "No authentication is required as the token serves as proof of identity."
+    ),
     request=PasswordResetConfirmSerializer,
     responses={
-        200: OpenApiResponse(description="Password reset successful"),
-        400: OpenApiResponse(description="Invalid or expired token"),
-    }
+        200: OpenApiResponse(
+            description=(
+                "Password reset completed successfully. The user can now log in "
+                "with their new password. All existing sessions remain active."
+            )
+        ),
+        400: OpenApiResponse(
+            description=(
+                "Bad request. Common issues include:\n"
+                "- Invalid or malformed UID parameter\n"
+                "- Invalid, expired, or already used token\n"
+                "- New password doesn't meet security requirements\n"
+                "- Required fields are missing\n"
+                "- Reset link has been tampered with"
+            )
+        ),
+    },
+    tags=["Authentication"],
+    parameters=[
+        OpenApiParameter(
+            name="uid",
+            description="Base64-encoded user ID from the reset email link",
+            required=False,
+            type=str,
+            location=OpenApiParameter.QUERY
+        ),
+        OpenApiParameter(
+            name="token",
+            description="Password reset token from the reset email link",
+            required=False,
+            type=str,
+            location=OpenApiParameter.QUERY
+        ),
+    ]
 )
 class PasswordResetConfirmView(generics.GenericAPIView):
     serializer_class = PasswordResetConfirmSerializer
@@ -172,3 +319,4 @@ class PasswordResetConfirmView(generics.GenericAPIView):
         user.save()
 
         return Response({"detail": "Password reset successful"}, status=200)
+    
