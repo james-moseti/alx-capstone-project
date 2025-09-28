@@ -15,6 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.shortcuts import redirect
 from django.urls import path, include
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -43,4 +44,6 @@ urlpatterns = [
     path('api/orders/', include('orders.urls')),
     path('api/products/', include('products.urls')),
     path("api/payments/", include("payments.urls")),
+
+    path("", lambda request: redirect("swagger-ui", permanent=False)),
 ]
