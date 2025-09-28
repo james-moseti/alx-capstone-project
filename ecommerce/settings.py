@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from datetime import timedelta
 from pathlib import Path
 import environ
-from decouple import config
+# from decouple import config
 import os
 import dj_database_url
 from django.core.management.utils import get_random_secret_key
@@ -33,7 +33,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-y$yuv^lt*233@u(_=%7n_w=d5+t9ydm!*h1@4_#8r!fteow@vq'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = config("DEBUG", default=False, cast=bool)
+DEBUG = os.environ.get("DEBUG", "False")
 
 ALLOWED_HOSTS = ['*']
 
@@ -172,7 +172,7 @@ DB_HOST = os.environ.get("DB_HOST")
 DB_PORT = os.environ.get("DB_PORT")
 
 DATABASES = {
-    'default': dj_database_url.parse(config("DATABASE_URL"))
+    'default': dj_database_url.parse(os.environ.get("DATABASE_URL"))
     }
 
 # DATABASES = {
