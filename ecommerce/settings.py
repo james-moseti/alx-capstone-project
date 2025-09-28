@@ -97,11 +97,29 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     'TITLE': 'Ecommerce API',
-    'DESCRIPTION': 'Backend API for ecommerce app with JWT authentication',
+    'DESCRIPTION': '''
+    Backend API for ecommerce platform with JWT authentication.
+    
+    **Authentication:** Include JWT token in Authorization header: `Bearer your_jwt_token`
+    **Base URL:** /api/
+    ''',
     'VERSION': '1.0.0',
-    'SERVE_INCLUDE_SCHEMA': False,   # keeps `/schema/` endpoint hidden from the UI itself
+    'SERVE_INCLUDE_SCHEMA': False,   # keeps `/schema/` endpoint hidden from the UI
     'SERVE_PERMISSIONS': [],         # public docs (adjust if needed)
-    "SECURITY": [{"BearerAuth": []}],
+    'COMPONENT_SPLIT_REQUEST': True, # better schema organization
+    'SCHEMA_PATH_PREFIX': '/api/',   # API path prefix
+    'SECURITY': [{'BearerAuth': []}],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,  # remember auth token
+        'displayOperationId': False,
+    },
+    'TAGS': [
+        {'name': 'Auth', 'description': 'Authentication endpoints'},
+        {'name': 'Products', 'description': 'Product management'},
+        {'name': 'Orders', 'description': 'Order operations'},
+        {'name': 'Payments', 'description': 'Payment processing'},
+    ]
 }
 
 SIMPLE_JWT = {
