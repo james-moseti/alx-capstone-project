@@ -84,6 +84,16 @@ REST_FRAMEWORK = {
         "rest_framework.permissions.IsAuthenticated",
     ),
 
+    # Rate limiting / Throttling
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/hour",      # Anonymous users: 100 requests per hour
+        "user": "1000/hour",     # Authenticated users: 1000 requests per hour
+    },
+
     # Filtering, searching, ordering
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
